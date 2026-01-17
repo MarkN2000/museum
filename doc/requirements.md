@@ -18,7 +18,7 @@ WebXRを使用して、ジャパンサーチのIIIFデータを利用した絵�
    - タイトルと簡単な説明。
    - 表示する作品を選択するUI。
 2. **Selection Methods**:
-   - **Presets**: 事前に設定された有名な絵画リストから選択。
+   - **Presets**: 事前に設定された有名な絵画リストから選択。（まずはこちらを作る）
    - **Search**: ジャパンサーチAPIを利用してキーワード検索し、IIIF対応コンテンツを選択。
 3. **Transition**: 作品決定後、「ARで見る」ボタンでWebXRモードへ移行。
 
@@ -38,14 +38,14 @@ WebXRを使用して、ジャパンサーチのIIIFデータを利用した絵�
 
 ## 4. Technical Requirements
 - **IIIF Integration**: 
-  - メタデータから実際の寸法（mm/cm）を取得できるか確認が必要。寸法データがない場合はデフォルト値またはユーザー入力で補完。
+  - メタデータから実際の寸法（mm/cm）を取得できるか確認が必要。寸法データがない場合は非対応として表示しない。
   - 画像はタイル画像ではなく、適度なサイズの画像を生成してテクスチャとして利用（IIIF Image API）。
 - **AR Framework**: 
   - WebXR Hit Test API (for transparency/placement).
   - フォールバックとして `model-viewer` (Google) のARモードも検討（実装が容易だがカスタマイズに制限あり）。
 
 ## 5. Potential Challenges
-- **Scale Data**: ジャパンサーチのすべてのIIIFデータに正確な物理サイズメタデータが含まれているとは限らない。
+- **Scale Data**: ジャパンサーチのすべてのIIIFデータに正確な物理サイズメタデータが含まれているとは限らない。（値があればそれが正確なものと仮定する）
 - **Browser Compatibility**: iOS SafariでのWebXRサポート状況（WebXRはまだ実験的な場合があるため、MozillaのWebXR Viewerや、`model-viewer` のQuickLook/SceneViewer連携が必要になる可能性が高い）。
 
 ## 6. Next Steps
