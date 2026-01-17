@@ -1,0 +1,27 @@
+# General
+.DS_Store
+Thumbs.db
+
+# Windows
+desktop.ini
+$RECYCLE.BIN/
+
+# Editors
+.vscode/
+*.code-workspace
+.idea/
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+build/
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
