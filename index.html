@@ -62,7 +62,10 @@
         
         <div class="ar-controls">
             <p id="artwork-info" class="ar-info">サイズ: -- x -- cm</p>
-            <button id="ar-btn" class="ar-activate-btn">🚀 ARで見る</button>
+            <div class="ar-button-group">
+                <button id="ar-btn" class="ar-activate-btn">🚀 ARで見る</button>
+                <button id="wall-ar-btn" class="ar-activate-btn ar-wall-btn">🧱 壁に配置</button>
+            </div>
         </div>
     </div>
 
@@ -82,9 +85,12 @@
         const viewer = document.getElementById('artwork-viewer');
         const sourceLink = document.getElementById('source-link');
         const licenseText = document.getElementById('license-text');
+        const wallArBtn = document.getElementById('wall-ar-btn');
 
         // Current artwork data
         let currentArtwork = null;
+
+        // Note: Wall AR button is always visible now
 
         // ===== Render Selection Cards =====
         function renderCards() {
@@ -210,13 +216,18 @@
             viewer.activateAR();
         });
         
-        // Custom load button disabled - will be re-enabled with proxy server
-        // customLoadBtn.addEventListener('click', () => {
-        //     const id = customIdInput.value.trim();
-        //     if (id) {
-        //         loadArtwork(id);
-        //     }
-        // });
+        // Wall AR button - opens A-Frame AR with grab placement
+        wallArBtn.addEventListener('click', () => {
+            if (currentArtwork) {
+                const params = new URLSearchParams({
+                    glb: currentArtwork.glbPath,
+                    title: currentArtwork.title,
+                    width: currentArtwork.widthCm,
+                    height: currentArtwork.heightCm
+                });
+                window.location.href = `ar-wall.html?${params.toString()}`;
+            }
+        });
 
         // Initialize
         renderCards();

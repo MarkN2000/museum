@@ -334,7 +334,23 @@ model-viewer {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  flex: 1;
+}
+
+/* Button group for multiple AR options */
+.ar-button-group {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.ar-wall-btn {
+  background: linear-gradient(135deg, #4a90d9, #357abd);
+}
+
+.ar-wall-btn:hover {
+  background: linear-gradient(135deg, #5aa0e9, #4588c9);
 }
 
 /* Hide guide when AR is active (JS will handle this) */

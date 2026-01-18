@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>壁に配置 - Museum AR</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        #ar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .ar-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            pointer-events: auto;
+            z-index: 101;
+        }
+        
+        .back-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 8px;
+        }
+        
+        .ar-title {
+            flex: 1;
+            margin-left: 12px;
+            font-size: 1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .ar-size {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+        
+        .place-button-container {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: auto;
+            z-index: 101;
+        }
+        
+        .place-btn {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 4px solid #fff;
+            background: rgba(233, 69, 96, 0.9);
+            color: #fff;
+            font-size: 2.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s, background 0.1s;
+            touch-action: none;
+            user-select: none;
+        }
+        
+        .place-btn:active, .place-btn.active {
+            transform: scale(1.1);
+            background: rgba(76, 175, 80, 0.9);
+        }
+        
+        .place-btn.placed {
+            background: rgba(76, 175, 80, 0.9);
+            border-color: #4caf50;
+        }
+        
+        .status-text {
+            position: fixed;
+            bottom: 160px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            pointer-events: none;
+            z-index: 101;
+        }
+        
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.2);
+            border-top-color: #e94560;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            margin-top: 20px;
+            color: #aaa;
+        }
+        
+        a-scene {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <p class="loading-text">ARを起動中...</p>
+    </div>
+
+    <!-- AR Overlay UI -->
+    <div id="ar-overlay">
+        <div class="ar-header">
+            <button class="back-btn" id="back-btn">←</button>
+            <div>
+                <h2 class="ar-title" id="title">作品名</h2>
+                <p class="ar-size" id="size">サイズ: -- x -- cm</p>
+            </div>
+        </div>
+        
+        <p class="status-text" id="status">📍 ボタンを押して配置</p>
+        
+        <div class="place-button-container">
+            <button class="place-btn" id="place-btn">📍</button>
+        </div>
+    </div>
+
+    <!-- A-Frame Scene -->
+    <a-scene
+        id="ar-scene"
+        webxr="requiredFeatures: hit-test, local-floor; optionalFeatures: dom-overlay; overlayElement: #ar-overlay"
+        renderer="colorManagement: true; physicallyCorrectLights: true"
+        vr-mode-ui="enabled: false"
+        embedded>
+        
+        <a-assets>
+            <a-asset-item id="artwork-model" src=""></a-asset-item>
+        </a-assets>
+        
+        <a-entity id="artwork" gltf-model="#artwork-model" visible="false" scale="1 1 1"></a-entity>
+        
+        <a-entity id="reticle" visible="false">
+            <a-ring color="#fff" radius-inner="0.04" radius-outer="0.05" rotation="-90 0 0"></a-ring>
+        </a-entity>
+        
+    </a-scene>
+
+    <script>
+        // Get URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const glbPath = params.get('glb');
+        const title = params.get('title') || '作品';
+        const widthCm = parseFloat(params.get('width')) || 30;
+        const heightCm = parseFloat(params.get('height')) || 40;
+
+        // Update UI
+        document.getElementById('title').textContent = title;
+        document.getElementById('size').textContent = `サイズ: ${widthCm} x ${heightCm} cm`;
+
+        // DOM elements
+        const loadingScreen = document.getElementById('loading-screen');
+        const backBtn = document.getElementById('back-btn');
+        const placeBtn = document.getElementById('place-btn');
+        const statusText = document.getElementById('status');
+        const scene = document.getElementById('ar-scene');
+        const artwork = document.getElementById('artwork');
+        const reticle = document.getElementById('reticle');
+        const assetItem = document.getElementById('artwork-model');
+
+        // Set GLB source
+        if (glbPath) {
+            assetItem.setAttribute('src', glbPath);
+        }
+
+        // State
+        let isPlacing = false;
+        let isPlaced = false;
+        let xrHitTestSource = null;
+
+        // Back button
+        backBtn.addEventListener('click', () => {
+            window.history.back();
+        });
+
+        // A-Frame AR session handling
+        scene.addEventListener('enter-vr', () => {
+            loadingScreen.style.display = 'none';
+            console.log('Entered AR');
+        });
+
+        scene.addEventListener('exit-vr', () => {
+            window.history.back();
+        });
+
+        // Hit test setup
+        scene.addEventListener('enter-vr', async () => {
+            const session = scene.xrSession;
+            if (!session) return;
+
+            try {
+                const referenceSpace = await session.requestReferenceSpace('viewer');
+                xrHitTestSource = await session.requestHitTestSource({ space: referenceSpace });
+                console.log('Hit test source created');
+            } catch (err) {
+                console.error('Hit test setup failed:', err);
+            }
+        });
+
+        // Place button handlers
+        placeBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            isPlacing = true;
+            placeBtn.classList.add('active');
+            statusText.textContent = '🎯 壁を探しています...';
+            artwork.setAttribute('visible', true);
+            reticle.setAttribute('visible', true);
+        });
+
+        placeBtn.addEventListener('pointerup', () => {
+            if (isPlacing) {
+                isPlacing = false;
+                placeBtn.classList.remove('active');
+                
+                if (artwork.getAttribute('visible')) {
+                    isPlaced = true;
+                    placeBtn.classList.add('placed');
+                    placeBtn.textContent = '✓';
+                    statusText.textContent = '✅ 配置完了！';
+                    reticle.setAttribute('visible', false);
+                }
+            }
+        });
+
+        placeBtn.addEventListener('pointerleave', () => {
+            if (isPlacing) {
+                isPlacing = false;
+                placeBtn.classList.remove('active');
+            }
+        });
+
+        // Frame update for hit testing
+        scene.addEventListener('enter-vr', () => {
+            const renderer = scene.renderer;
+            
+            renderer.xr.addEventListener('sessionstart', () => {
+                const session = renderer.xr.getSession();
+                
+                session.requestAnimationFrame(function onFrame(time, frame) {
+                    if (!frame) return;
+                    session.requestAnimationFrame(onFrame);
+                    
+                    if (!isPlacing || !xrHitTestSource) return;
+                    
+                    const referenceSpace = renderer.xr.getReferenceSpace();
+                    const hitTestResults = frame.getHitTestResults(xrHitTestSource);
+                    
+                    if (hitTestResults.length > 0) {
+                        const hit = hitTestResults[0];
+                        const pose = hit.getPose(referenceSpace);
+                        
+                        if (pose) {
+                            const position = pose.transform.position;
+                            const orientation = pose.transform.orientation;
+                            
+                            // Update artwork position
+                            artwork.object3D.position.set(position.x, position.y, position.z);
+                            artwork.object3D.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w);
+                            
+                            // Update reticle
+                            reticle.object3D.position.set(position.x, position.y, position.z);
+                            
+                            statusText.textContent = '🧱 壁を検出！';
+                        }
+                    } else {
+                        // No hit - place at 1m in front of camera
+                        const camera = renderer.xr.getCamera();
+                        const cameraPosition = new THREE.Vector3();
+                        const cameraDirection = new THREE.Vector3();
+                        
+                        camera.getWorldPosition(cameraPosition);
+                        camera.getWorldDirection(cameraDirection);
+                        
+                        const distance = 1.0; // 1 meter fallback
+                        const targetPosition = cameraPosition.clone().add(cameraDirection.multiplyScalar(distance));
+                        
+                        artwork.object3D.position.copy(targetPosition);
+                        artwork.object3D.lookAt(cameraPosition);
+                        
+                        reticle.object3D.position.copy(targetPosition);
+                        
+                        statusText.textContent = '📍 1m先に配置';
+                    }
+                });
+            });
+        });
+
+        // Start AR session automatically
+        scene.addEventListener('loaded', () => {
+            setTimeout(() => {
+                scene.enterVR();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
