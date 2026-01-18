@@ -9,6 +9,9 @@
     <!-- model-viewer -->
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     
+    <!-- QR Code generator (qrcode-generator library) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <!-- Custom Styles -->
     <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -62,8 +65,19 @@
         
         <div class="ar-controls">
             <p id="artwork-info" class="ar-info">サイズ: -- x -- cm</p>
-            <button id="ar-btn" class="ar-activate-btn">🚀 ARで壁に配置</button>
-            <p class="ar-guide-text">💡 画像を掴んで壁に配置してください</p>
+            
+            <!-- AR Button (shown on AR-capable devices) -->
+            <div id="ar-section">
+                <button id="ar-btn" class="ar-activate-btn">🚀 ARで壁に配置</button>
+                <p class="ar-guide-text">💡 画像を掴んで壁に配置してください</p>
+            </div>
+            
+            <!-- QR Code (shown on non-AR devices like PC) -->
+            <div id="qr-section" style="display: none;">
+                <p class="qr-title">📱 スマートフォンでスキャン</p>
+                <div id="qr-code"></div>
+                <p class="qr-url">museum.markn2000.com</p>
+            </div>
         </div>
     </div>
 
@@ -83,9 +97,57 @@
         const viewer = document.getElementById('artwork-viewer');
         const sourceLink = document.getElementById('source-link');
         const licenseText = document.getElementById('license-text');
+        const arSection = document.getElementById('ar-section');
+        const qrSection = document.getElementById('qr-section');
 
         // Current artwork data
         let currentArtwork = null;
+
+        // Check if device supports AR and show appropriate UI
+        function checkARSupport() {
+            // model-viewer has canActivateAR property
+            viewer.addEventListener('load', () => {
+                if (viewer.canActivateAR) {
+                    // AR is available - show AR button
+                    arSection.style.display = 'block';
+                    qrSection.style.display = 'none';
+                } else {
+                    // No AR - show QR code
+                    arSection.style.display = 'none';
+                    qrSection.style.display = 'block';
+                    generateQRCode();
+                }
+            });
+            
+            // Also check immediately for first load
+            setTimeout(() => {
+                if (!viewer.canActivateAR) {
+                    arSection.style.display = 'none';
+                    qrSection.style.display = 'block';
+                    generateQRCode();
+                }
+            }, 1000);
+        }
+        
+        // Generate QR code
+        let qrCodeInstance = null;
+        function generateQRCode() {
+            if (typeof QRCode !== 'undefined' && !qrCodeInstance) {
+                const qrContainer = document.getElementById('qr-code');
+                qrContainer.innerHTML = ''; // Clear previous
+                qrCodeInstance = new QRCode(qrContainer, {
+                    text: 'https://museum.markn2000.com/',
+                    width: 180,
+                    height: 180,
+                    colorDark: '#1a1a2e',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.L
+                });
+            }
+        }
+        
+        // Initialize AR check
+        checkARSupport();
 
         // ===== Render Selection Cards =====
         function renderCards() {
