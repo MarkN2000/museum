@@ -22,12 +22,14 @@
             <div class="loading">読み込み中...</div>
         </div>
         
-        <!-- Custom URL Input (Optional) -->
+        <!-- Custom URL Input - disabled for now, will use proxy server later -->
+        <!--
         <div class="custom-input-section">
             <label for="custom-jpsearch-id">ジャパンサーチID を入力</label>
             <input type="text" id="custom-jpsearch-id" placeholder="例: tfam_art_db-3628">
             <button id="custom-load-btn">この作品を見る</button>
         </div>
+        -->
     </div>
 
     <!-- ===== AR Viewer Screen ===== -->
@@ -58,8 +60,8 @@
 
     <!-- ===== JavaScript ===== -->
     <script type="module">
-        import { PRESET_ARTWORKS } from './js/presets.js?v=4';
-        import { fetchArtworkData, getThumbnailUrl } from './js/jpsearch.js?v=4';
+        import { PRESET_ARTWORKS } from './js/presets.js?v=6';
+        // Note: jpsearch.js not needed when using local images only
 
         // DOM Elements
         const selectionScreen = document.getElementById('selection-screen');
@@ -70,8 +72,7 @@
         const artworkTitle = document.getElementById('artwork-title');
         const artworkInfo = document.getElementById('artwork-info');
         const viewer = document.getElementById('artwork-viewer');
-        const customIdInput = document.getElementById('custom-jpsearch-id');
-        const customLoadBtn = document.getElementById('custom-load-btn');
+        // Custom input elements removed - will be re-enabled with proxy server
 
         // Current artwork data
         let currentArtwork = null;
@@ -87,7 +88,7 @@
                 
                 const img = document.createElement('img');
                 img.className = 'card-thumbnail';
-                img.src = artwork.thumbnailUrl || getThumbnailUrl(artwork.id);
+                img.src = artwork.thumbnailPath || artwork.localImagePath;
                 img.alt = artwork.label;
                 img.onerror = () => { img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23333" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%23666" font-size="12">No Image</text></svg>'; };
                 
@@ -112,17 +113,18 @@
                 artworkInfo.textContent = '';
                 showARScreen();
                 
-                // Find preset data for this item (may contain overrides)
+                // Find preset data for this item
                 const preset = PRESET_ARTWORKS.find(p => p.id === itemId);
                 
-                // Fetch metadata from Japan Search
-                const data = await fetchArtworkData(itemId);
+                if (!preset) {
+                    throw new Error(`作品が見つかりません: ${itemId}`);
+                }
                 
-                // Apply preset overrides if available
-                const title = data.title;
-                const widthCm = preset?.widthCm ?? data.widthCm;
-                const heightCm = preset?.heightCm ?? data.heightCm;
-                const imageUrl = preset?.textureUrl ?? data.imageUrl; // Use CORS-friendly URL if available
+                // Use local preset data
+                const title = preset.label;
+                const widthCm = preset.widthCm;
+                const heightCm = preset.heightCm;
+                const imageUrl = preset.localImagePath;
                 
                 currentArtwork = { title, widthCm, heightCm, imageUrl };
                 
@@ -184,12 +186,13 @@
             viewer.activateAR();
         });
         
-        customLoadBtn.addEventListener('click', () => {
-            const id = customIdInput.value.trim();
-            if (id) {
-                loadArtwork(id);
-            }
-        });
+        // Custom load button disabled - will be re-enabled with proxy server
+        // customLoadBtn.addEventListener('click', () => {
+        //     const id = customIdInput.value.trim();
+        //     if (id) {
+        //         loadArtwork(id);
+        //     }
+        // });
 
         // Initialize
         renderCards();

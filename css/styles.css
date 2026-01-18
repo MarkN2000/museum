@@ -127,8 +127,13 @@ body {
 /* ===== AR Viewer Screen ===== */
 #ar-screen {
   display: none;
-  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   flex-direction: column;
+  overflow: hidden;
 }
 
 #ar-screen.active {
@@ -167,6 +172,7 @@ body {
 #ar-container {
   flex: 1;
   position: relative;
+  padding-bottom: 100px; /* Space for fixed controls */
 }
 
 model-viewer {
@@ -175,8 +181,14 @@ model-viewer {
 }
 
 .ar-controls {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
   background: var(--card-bg);
+  z-index: 100;
 }
 
 .ar-info {
