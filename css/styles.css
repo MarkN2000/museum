@@ -248,3 +248,72 @@ model-viewer {
   margin: 20px;
   text-align: center;
 }
+
+/* ===== AR Guide & Prompt Styles ===== */
+
+/* AR Guide overlay (shown before AR starts) */
+.ar-guide {
+  position: absolute;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 1rem;
+  max-width: 300px;
+  backdrop-filter: blur(8px);
+  z-index: 10;
+}
+
+.ar-guide p {
+  margin: 0;
+}
+
+.ar-guide-sub {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-top: 8px !important;
+}
+
+/* AR Prompt (custom AR button in model-viewer slot) */
+.ar-prompt {
+  display: none; /* Hidden by default, model-viewer shows it */
+}
+
+/* Model loading spinner */
+.model-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* AR Button improvements */
+.ar-activate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 1.2rem;
+}
+
+/* Hide guide when AR is active (JS will handle this) */
+#ar-screen.ar-active .ar-guide {
+  display: none;
+}
+

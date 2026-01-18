@@ -3,12 +3,14 @@
  * 
  * ローカル画像を使用するバージョン。
  * 画像は assets/images/ に配置してください。
+ * GLBは generate_artwork_glb.py で生成します。
  * 
  * 各エントリ:
  * - id: 識別子
  * - label: 表示名
  * - localImagePath: assets/images/ 内の画像パス
  * - thumbnailPath: サムネイル画像パス（同じでもOK）
+ * - glbPath: AR表示用GLBファイルパス
  * - widthCm: 横幅 (cm)
  * - heightCm: 縦幅 (cm)
  * - source: 出典URL（ライセンス確認用）
@@ -20,6 +22,7 @@ export const PRESET_ARTWORKS = [
     label: "冨嶽三十六景 山下白雨",
     localImagePath: "assets/images/03621.jpg",
     thumbnailPath: "assets/images/03621.jpg",
+    glbPath: "assets/03621.glb",
     widthCm: 37.7,
     heightCm: 25.5,
     source: "https://jpsearch.go.jp/item/tfam_art_db-3621",

@@ -45,10 +45,12 @@
                 src="assets/plane.gltf" 
                 ar 
                 ar-placement="wall"
+                ar-scale="fixed"
                 ar-modes="webxr scene-viewer quick-look" 
                 camera-controls 
-                shadow-intensity="1"
-                scale="0.5 0.5 1">
+                shadow-intensity="0.5"
+                scale="0.5 0.5 1"
+                touch-action="pan-y">
             </model-viewer>
         </div>
         
@@ -60,7 +62,7 @@
 
     <!-- ===== JavaScript ===== -->
     <script type="module">
-        import { PRESET_ARTWORKS } from './js/presets.js?v=6';
+        import { PRESET_ARTWORKS } from './js/presets.js?v=7';
         // Note: jpsearch.js not needed when using local images only
 
         // DOM Elements
@@ -124,16 +126,21 @@
                 const title = preset.label;
                 const widthCm = preset.widthCm;
                 const heightCm = preset.heightCm;
-                const imageUrl = preset.localImagePath;
+                const glbPath = preset.glbPath;
                 
-                currentArtwork = { title, widthCm, heightCm, imageUrl };
+                currentArtwork = { title, widthCm, heightCm, glbPath };
                 
                 // Update UI
                 artworkTitle.textContent = title;
                 artworkInfo.textContent = `サイズ: ${widthCm} x ${heightCm} cm`;
                 
-                // Update 3D model
-                await updateModelTexture(imageUrl, widthCm, heightCm);
+                // Load the artwork-specific GLB (with embedded texture and correct size)
+                viewer.src = glbPath;
+                
+                // GLB already contains correct size in meters, use scale 1:1
+                viewer.scale = '1 1 1';
+                
+                console.log(`Loaded artwork: ${glbPath} (${widthCm} x ${heightCm} cm)`);
                 
             } catch (error) {
                 console.error('Failed to load artwork:', error);
