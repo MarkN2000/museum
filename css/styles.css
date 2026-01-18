@@ -1,0 +1,238 @@
+/* Museum AR - Styles */
+
+:root {
+  --primary-color: #1a1a2e;
+  --secondary-color: #16213e;
+  --accent-color: #e94560;
+  --text-color: #eaeaea;
+  --card-bg: #0f0f1a;
+  --card-hover: #1f1f3a;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  color: var(--text-color);
+  min-height: 100vh;
+}
+
+/* ===== Selection Screen ===== */
+#selection-screen {
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.screen-title {
+  text-align: center;
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  color: var(--text-color);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.artwork-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.artwork-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  background: var(--card-hover);
+}
+
+.artwork-card:active {
+  transform: scale(0.98);
+}
+
+.card-thumbnail {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background-color: #333;
+}
+
+.card-title {
+  padding: 12px;
+  font-size: 0.9rem;
+  text-align: center;
+  line-height: 1.3;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Custom URL Input */
+.custom-input-section {
+  max-width: 600px;
+  margin: 30px auto 0;
+  padding: 20px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.custom-input-section label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.custom-input-section input {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #222;
+  color: var(--text-color);
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+
+.custom-input-section button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-color);
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.custom-input-section button:hover {
+  background: #ff6b7a;
+}
+
+/* ===== AR Viewer Screen ===== */
+#ar-screen {
+  display: none;
+  height: 100vh;
+  flex-direction: column;
+}
+
+#ar-screen.active {
+  display: flex;
+}
+
+#selection-screen.hidden {
+  display: none;
+}
+
+.ar-header {
+  padding: 12px 20px;
+  background: var(--card-bg);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 8px;
+}
+
+.ar-title {
+  font-size: 1rem;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#ar-container {
+  flex: 1;
+  position: relative;
+}
+
+model-viewer {
+  width: 100%;
+  height: 100%;
+}
+
+.ar-controls {
+  padding: 16px;
+  background: var(--card-bg);
+}
+
+.ar-info {
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+  text-align: center;
+  color: #aaa;
+}
+
+.ar-activate-btn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent-color);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ar-activate-btn:hover {
+  background: #ff6b7a;
+}
+
+/* Loading State */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: #888;
+}
+
+.loading::after {
+  content: '';
+  width: 24px;
+  height: 24px;
+  margin-left: 12px;
+  border: 3px solid #444;
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error State */
+.error-message {
+  background: rgba(233, 69, 96, 0.2);
+  border: 1px solid var(--accent-color);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 20px;
+  text-align: center;
+}

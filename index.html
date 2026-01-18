@@ -3,169 +3,196 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Museum AR Prototype</title>
-    <!-- Use the latest version of model-viewer -->
+    <title>Museum AR - 絵画を実寸で見る</title>
+    <meta name="description" content="ARを使って美術作品を実際のサイズで鑑賞しよう">
+    
+    <!-- model-viewer -->
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            font-family: sans-serif;
-            height: 100%;
-            background-color: #f0f0f0;
-        }
-        #ar-container {
-            width: 100%;
-            height: 60vh;
-        }
-        model-viewer {
-            width: 100%;
-            height: 100%;
-        }
-        #controls {
-            padding: 20px;
-            background: white;
-            height: 40vh;
-            box-sizing: border-box;
-            overflow-y: auto;
-        }
-        input, button {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-        }
-        label {
-            font-weight: bold;
-            display: block;
-            margin-bottom: 5px;
-        }
-        .note {
-            font-size: 0.8em;
-            color: #666;
-        }
-    </style>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-
-    <div id="ar-container">
-        <!-- 
-            model-viewer setup:
-            - src: Base model (Placeholder Box scaled to look like a plane)
-            - ar: Enable AR
-            - ar-placement="wall": Prioritize vertical placement
-            - ar-modes: "webxr scene-viewer quick-look" (Order matters)
-        -->
-        <model-viewer 
-            id="artwork-viewer"
-            src="assets/plane.gltf" 
-            ar 
-            ar-placement="wall"
-            ar-modes="webxr scene-viewer quick-look" 
-            camera-controls 
-            shadow-intensity="1"
-            scale="0.5 0.5 1"> <!-- Initial scale -->
-        </model-viewer>
-    </div>
-
-    <div id="controls">
-        <h3>AR Artwork Settings</h3>
+    <!-- ===== Selection Screen ===== -->
+    <div id="selection-screen">
+        <h1 class="screen-title">🖼️ 作品を選択</h1>
         
-        <label for="img-url">Image URL</label>
-        <input type="text" id="img-url" value="https://0.api.artsmia.org/800/62742.jpg" placeholder="https://...">
-        
-        <div style="display: flex; gap: 10px;">
-            <div style="flex: 1;">
-                <label for="width-cm">Width (cm)</label>
-                <input type="number" id="width-cm" value="50">
-            </div>
-            <div style="flex: 1;">
-                <label for="height-cm">Height (cm)</label>
-                <input type="number" id="height-cm" value="50">
-            </div>
+        <div id="card-grid" class="card-grid">
+            <!-- Cards will be dynamically inserted here -->
+            <div class="loading">読み込み中...</div>
         </div>
-
-        <button id="update-btn">Apply & View</button>
-        <button id="ar-btn" style="background-color: #007bff; color: white;">Activate AR (Manual)</button>
-
-        <p class="note">
-            Note: On iOS, this will generate a USDZ. Texture updates might take a moment.
-            Wall placement requires scanning a vertical surface.
-        </p>
+        
+        <!-- Custom URL Input (Optional) -->
+        <div class="custom-input-section">
+            <label for="custom-jpsearch-id">ジャパンサーチID を入力</label>
+            <input type="text" id="custom-jpsearch-id" placeholder="例: tfam_art_db-3628">
+            <button id="custom-load-btn">この作品を見る</button>
+        </div>
     </div>
 
-    <script>
-        const viewer = document.querySelector('#artwork-viewer');
-        const imgUrlInput = document.querySelector('#img-url');
-        const widthInput = document.querySelector('#width-cm');
-        const heightInput = document.querySelector('#height-cm');
-        const updateBtn = document.querySelector('#update-btn');
-        const arBtn = document.querySelector('#ar-btn');
+    <!-- ===== AR Viewer Screen ===== -->
+    <div id="ar-screen">
+        <header class="ar-header">
+            <button id="back-btn" class="back-button">←</button>
+            <h2 id="artwork-title" class="ar-title">作品名</h2>
+        </header>
+        
+        <div id="ar-container">
+            <model-viewer 
+                id="artwork-viewer"
+                src="assets/plane.gltf" 
+                ar 
+                ar-placement="wall"
+                ar-modes="webxr scene-viewer quick-look" 
+                camera-controls 
+                shadow-intensity="1"
+                scale="0.5 0.5 1">
+            </model-viewer>
+        </div>
+        
+        <div class="ar-controls">
+            <p id="artwork-info" class="ar-info">サイズ: -- x -- cm</p>
+            <button id="ar-btn" class="ar-activate-btn">🚀 ARで見る</button>
+        </div>
+    </div>
 
-        // Function to update the 3D model texture and scale
-        async function updateArtwork() {
-            const url = imgUrlInput.value;
-            const widthCm = parseFloat(widthInput.value);
-            const heightCm = parseFloat(heightInput.value);
+    <!-- ===== JavaScript ===== -->
+    <script type="module">
+        import { PRESET_ARTWORKS } from './js/presets.js?v=4';
+        import { fetchArtworkData, getThumbnailUrl } from './js/jpsearch.js?v=4';
 
-            if (!url || isNaN(widthCm) || isNaN(heightCm)) {
-                alert("Please enter valid URL and dimensions.");
-                return;
-            }
+        // DOM Elements
+        const selectionScreen = document.getElementById('selection-screen');
+        const arScreen = document.getElementById('ar-screen');
+        const cardGrid = document.getElementById('card-grid');
+        const backBtn = document.getElementById('back-btn');
+        const arBtn = document.getElementById('ar-btn');
+        const artworkTitle = document.getElementById('artwork-title');
+        const artworkInfo = document.getElementById('artwork-info');
+        const viewer = document.getElementById('artwork-viewer');
+        const customIdInput = document.getElementById('custom-jpsearch-id');
+        const customLoadBtn = document.getElementById('custom-load-btn');
 
-            try {
-                // 1. Update Texture
-                // Create a texture from the image URL
-                console.log(`Attempting to load texture from: ${url}`);
-                const texture = await viewer.createTexture(url);
-                console.log("Texture created successfully", texture);
+        // Current artwork data
+        let currentArtwork = null;
+
+        // ===== Render Selection Cards =====
+        function renderCards() {
+            cardGrid.innerHTML = '';
+            
+            for (const artwork of PRESET_ARTWORKS) {
+                const card = document.createElement('div');
+                card.className = 'artwork-card';
+                card.dataset.id = artwork.id;
                 
-                // Apply to the base color of the material
-                if (viewer.model && viewer.model.materials && viewer.model.materials.length > 0) {
-                    const material = viewer.model.materials[0];
-                    
-                    // Set the base color texture
-                    material.pbrMetallicRoughness.baseColorTexture.setTexture(texture);
-                    
-                    // Reset metallic/roughness for better image visibility
-                    material.pbrMetallicRoughness.setRoughnessFactor(1);
-                    material.pbrMetallicRoughness.setMetallicFactor(0);
-                    
-                    // Reset baseColorFactor to white (fix for red tint)
-                    material.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
-                    
-                    console.log("Texture applied to material[0]");
-                } else {
-                    console.error("No materials found on the model.");
-                    alert("Error: Model has no materials.");
-                }
-
-                // 2. Update Scale
-                const wM = widthCm / 100;
-                const hM = heightCm / 100;
-                const thickness = 0.02; // 2cm thickness
+                const img = document.createElement('img');
+                img.className = 'card-thumbnail';
+                img.src = artwork.thumbnailUrl || getThumbnailUrl(artwork.id);
+                img.alt = artwork.label;
+                img.onerror = () => { img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23333" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%23666" font-size="12">No Image</text></svg>'; };
                 
-                viewer.scale = `${wM} ${hM} ${thickness}`;
-                console.log(`Updated: Scale(${wM}, ${hM}, ${thickness})`);
-
-            } catch (error) {
-                console.error("Error loading texture:", error);
-                alert(`Error loading texture: ${error.message}. Check console for details (CORS?).`);
+                const title = document.createElement('div');
+                title.className = 'card-title';
+                title.textContent = artwork.label;
+                
+                card.appendChild(img);
+                card.appendChild(title);
+                
+                card.addEventListener('click', () => loadArtwork(artwork.id));
+                
+                cardGrid.appendChild(card);
             }
         }
 
-        updateBtn.addEventListener('click', updateArtwork);
+        // ===== Load Artwork =====
+        async function loadArtwork(itemId) {
+            try {
+                // Show loading state
+                artworkTitle.textContent = '読み込み中...';
+                artworkInfo.textContent = '';
+                showARScreen();
+                
+                // Find preset data for this item (may contain overrides)
+                const preset = PRESET_ARTWORKS.find(p => p.id === itemId);
+                
+                // Fetch metadata from Japan Search
+                const data = await fetchArtworkData(itemId);
+                
+                // Apply preset overrides if available
+                const title = data.title;
+                const widthCm = preset?.widthCm ?? data.widthCm;
+                const heightCm = preset?.heightCm ?? data.heightCm;
+                const imageUrl = preset?.textureUrl ?? data.imageUrl; // Use CORS-friendly URL if available
+                
+                currentArtwork = { title, widthCm, heightCm, imageUrl };
+                
+                // Update UI
+                artworkTitle.textContent = title;
+                artworkInfo.textContent = `サイズ: ${widthCm} x ${heightCm} cm`;
+                
+                // Update 3D model
+                await updateModelTexture(imageUrl, widthCm, heightCm);
+                
+            } catch (error) {
+                console.error('Failed to load artwork:', error);
+                artworkTitle.textContent = 'エラー';
+                artworkInfo.textContent = error.message;
+            }
+        }
 
-        // Wait for model to load before first update
-        viewer.addEventListener('load', () => {
-            console.log("Model loaded");
-            updateArtwork(); // Apply initial values
-        });
+        // ===== Update 3D Model =====
+        async function updateModelTexture(imageUrl, widthCm, heightCm) {
+            try {
+                console.log(`Loading texture: ${imageUrl}`);
+                const texture = await viewer.createTexture(imageUrl);
+                
+                if (viewer.model && viewer.model.materials && viewer.model.materials.length > 0) {
+                    const material = viewer.model.materials[0];
+                    material.pbrMetallicRoughness.baseColorTexture.setTexture(texture);
+                    material.pbrMetallicRoughness.setRoughnessFactor(1);
+                    material.pbrMetallicRoughness.setMetallicFactor(0);
+                    material.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+                }
+                
+                // Update scale (cm to meters)
+                const wM = widthCm / 100;
+                const hM = heightCm / 100;
+                viewer.scale = `${wM} ${hM} 0.02`;
+                
+                console.log(`Model updated: ${wM}m x ${hM}m`);
+            } catch (error) {
+                console.error('Texture error:', error);
+                throw new Error('画像の読み込みに失敗しました');
+            }
+        }
 
+        // ===== Screen Navigation =====
+        function showARScreen() {
+            selectionScreen.classList.add('hidden');
+            arScreen.classList.add('active');
+        }
+
+        function showSelectionScreen() {
+            arScreen.classList.remove('active');
+            selectionScreen.classList.remove('hidden');
+        }
+
+        // ===== Event Listeners =====
+        backBtn.addEventListener('click', showSelectionScreen);
+        
         arBtn.addEventListener('click', () => {
             viewer.activateAR();
         });
+        
+        customLoadBtn.addEventListener('click', () => {
+            const id = customIdInput.value.trim();
+            if (id) {
+                loadArtwork(id);
+            }
+        });
 
+        // Initialize
+        renderCards();
     </script>
 </body>
 </html>
