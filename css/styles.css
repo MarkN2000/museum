@@ -169,6 +169,31 @@ body {
   text-overflow: ellipsis;
 }
 
+/* Source & License Info */
+.source-info {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 0.75rem;
+  color: #aaa;
+}
+
+.source-info a {
+  color: #88b4ff;
+  text-decoration: none;
+}
+
+.source-info a:hover {
+  text-decoration: underline;
+}
+
+.license-text {
+  color: #888;
+}
+
 #ar-container {
   flex: 1;
   position: relative;

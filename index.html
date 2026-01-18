@@ -39,6 +39,12 @@
             <h2 id="artwork-title" class="ar-title">作品名</h2>
         </header>
         
+        <!-- Source & License Info -->
+        <div id="source-info" class="source-info">
+            <a id="source-link" href="#" target="_blank" rel="noopener">出典を見る</a>
+            <span id="license-text" class="license-text">ライセンス</span>
+        </div>
+        
         <div id="ar-container">
             <model-viewer 
                 id="artwork-viewer"
@@ -74,7 +80,8 @@
         const artworkTitle = document.getElementById('artwork-title');
         const artworkInfo = document.getElementById('artwork-info');
         const viewer = document.getElementById('artwork-viewer');
-        // Custom input elements removed - will be re-enabled with proxy server
+        const sourceLink = document.getElementById('source-link');
+        const licenseText = document.getElementById('license-text');
 
         // Current artwork data
         let currentArtwork = null;
@@ -133,6 +140,16 @@
                 // Update UI
                 artworkTitle.textContent = title;
                 artworkInfo.textContent = `サイズ: ${widthCm} x ${heightCm} cm`;
+                
+                // Update source and license info
+                if (preset.source) {
+                    sourceLink.href = preset.source;
+                    sourceLink.textContent = '出典を見る ↗';
+                    sourceLink.style.display = 'inline';
+                } else {
+                    sourceLink.style.display = 'none';
+                }
+                licenseText.textContent = preset.license || '';
                 
                 // Load the artwork-specific GLB (with embedded texture and correct size)
                 viewer.src = glbPath;
