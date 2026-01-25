@@ -339,15 +339,28 @@
         function showARScreen() {
             selectionScreen.classList.add('hidden');
             arScreen.classList.add('active');
+            // Add to browser history so back button returns to selection
+            history.pushState({ screen: 'artwork' }, '', '#artwork');
         }
 
         function showSelectionScreen() {
             arScreen.classList.remove('active');
             selectionScreen.classList.remove('hidden');
         }
+        
+        // Handle browser back button
+        window.addEventListener('popstate', (event) => {
+            // If we're on artwork screen, go back to selection
+            if (arScreen.classList.contains('active')) {
+                showSelectionScreen();
+            }
+        });
 
         // ===== Event Listeners =====
-        backBtn.addEventListener('click', showSelectionScreen);
+        backBtn.addEventListener('click', () => {
+            // Use history.back() to trigger popstate and go back properly
+            history.back();
+        });
         
         arBtn.addEventListener('click', () => {
             const isAndroid = /android/i.test(navigator.userAgent);
