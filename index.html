@@ -14,6 +14,16 @@
     
     <!-- Custom Styles -->
     <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- Three.js importmap for Android AR -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
 </head>
 <body>
     <!-- ===== Selection Screen ===== -->
@@ -79,6 +89,77 @@
             </div>
         </div>
     </div>
+
+    <!-- ===== Android WebXR AR Overlay ===== -->
+    <div id="android-ar-overlay" class="android-ar-overlay">
+        <div class="android-ar-header">
+            <button id="android-ar-close" class="android-ar-close">✕</button>
+            <div class="android-ar-info">
+                <div id="android-ar-title" class="android-ar-title">作品名</div>
+                <div id="android-ar-size" class="android-ar-size">サイズ: -- x -- cm</div>
+            </div>
+        </div>
+        <div id="android-ar-status" class="android-ar-status">📱 壁や床に向けてスキャン中...</div>
+    </div>
+
+    <!-- Android AR Styles -->
+    <style>
+        .android-ar-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10000;
+            display: none;
+        }
+        .android-ar-overlay.active {
+            display: block;
+        }
+        .android-ar-overlay > * {
+            pointer-events: auto;
+        }
+        .android-ar-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 16px;
+            padding-top: max(12px, env(safe-area-inset-top));
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .android-ar-close {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: #fff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        .android-ar-info { flex: 1; }
+        .android-ar-title { font-size: 1rem; font-weight: 600; color: #fff; }
+        .android-ar-size { font-size: 0.8rem; color: rgba(255,255,255,0.7); margin-top: 2px; }
+        .android-ar-status {
+            position: fixed;
+            bottom: max(30px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 14px 28px;
+            border-radius: 30px;
+            font-size: 1rem;
+            backdrop-filter: blur(10px);
+            text-align: center;
+            max-width: 90%;
+            color: #fff;
+        }
+        .android-ar-status.success {
+            background: rgba(34, 139, 34, 0.8);
+        }
+    </style>
 
     <!-- ===== JavaScript ===== -->
     <script type="module">
@@ -269,9 +350,290 @@
         backBtn.addEventListener('click', showSelectionScreen);
         
         arBtn.addEventListener('click', () => {
-            viewer.activateAR();
+            const isAndroid = /android/i.test(navigator.userAgent);
+            if (isAndroid && currentArtwork) {
+                // Android: WebXRベースのARを直接起動
+                startAndroidAR();
+            } else {
+                // iOS: 従来通りmodel-viewerのAR Quick Lookを使用
+                viewer.activateAR();
+            }
         });
 
+        // ===== Android WebXR AR =====
+        const androidArOverlay = document.getElementById('android-ar-overlay');
+        const androidArClose = document.getElementById('android-ar-close');
+        const androidArTitle = document.getElementById('android-ar-title');
+        const androidArSize = document.getElementById('android-ar-size');
+        const androidArStatus = document.getElementById('android-ar-status');
+        
+        let xrRenderer, xrScene, xrCamera;
+        let xrArtworkMesh = null;
+        let xrReticle = null;
+        let xrHitTestSource = null;
+        let xrHitTestSourceRequested = false;
+        let xrSession = null;
+        
+        async function startAndroidAR() {
+            console.log('startAndroidAR called');
+            
+            // Check WebXR support
+            if (!navigator.xr) {
+                alert('WebXRがサポートされていません');
+                return;
+            }
+            
+            try {
+                const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!isSupported) {
+                    alert('このデバイスではAR機能がサポートされていません');
+                    return;
+                }
+            } catch (e) {
+                alert('AR確認エラー: ' + e.message);
+                return;
+            }
+            
+            // Update UI
+            androidArTitle.textContent = currentArtwork.title;
+            androidArSize.textContent = `サイズ: ${currentArtwork.widthCm} x ${currentArtwork.heightCm} cm`;
+            androidArStatus.textContent = '📱 壁や床に向けてスキャン中...';
+            androidArStatus.classList.remove('success');
+            
+            // Initialize Three.js if needed
+            if (!xrRenderer) {
+                try {
+                    console.log('Initializing Three.js...');
+                    await initAndroidXR();
+                    console.log('Three.js initialized');
+                } catch (e) {
+                    console.error('Failed to initialize Three.js:', e);
+                    alert('3D初期化エラー: ' + e.message);
+                    return;
+                }
+            }
+            
+            // Load artwork
+            console.log('Loading artwork:', currentArtwork.glbPath);
+            loadXRArtwork(currentArtwork.glbPath);
+            
+            try {
+                // Request AR session (user gesture from button click)
+                xrSession = await navigator.xr.requestSession('immersive-ar', {
+                    requiredFeatures: ['hit-test', 'local-floor'],
+                    optionalFeatures: ['dom-overlay'],
+                    domOverlay: { root: androidArOverlay }
+                });
+                
+                xrRenderer.xr.setReferenceSpaceType('local-floor');
+                await xrRenderer.xr.setSession(xrSession);
+                
+                // Show overlay
+                androidArOverlay.classList.add('active');
+                
+                // Handle session end
+                xrSession.addEventListener('end', onXRSessionEnd);
+                
+                // Handle tap to place
+                xrSession.addEventListener('select', onXRSelect);
+                
+                // Start render loop
+                xrRenderer.setAnimationLoop(xrRender);
+                
+                console.log('Android AR session started');
+                
+            } catch (error) {
+                console.error('Failed to start AR:', error);
+                if (error.name === 'NotAllowedError') {
+                    alert('カメラへのアクセスが拒否されました');
+                } else {
+                    alert('AR起動エラー: ' + error.message);
+                }
+            }
+        }
+        
+        async function initAndroidXR() {
+            // Dynamic import of Three.js (uses importmap)
+            const threeModule = await import('three');
+            const gltfModule = await import('three/addons/loaders/GLTFLoader.js');
+            
+            // Store for later use - threeModule contains all THREE classes
+            window.THREE = threeModule;
+            window.GLTFLoader = gltfModule.GLTFLoader;
+            
+            const THREE = threeModule;
+            
+            xrScene = new THREE.Scene();
+            xrCamera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+            
+            xrRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            xrRenderer.setPixelRatio(window.devicePixelRatio);
+            xrRenderer.setSize(window.innerWidth, window.innerHeight);
+            xrRenderer.xr.enabled = true;
+            document.body.appendChild(xrRenderer.domElement);
+            
+            // Lighting - bright enough to show artwork clearly
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);  // Stronger ambient
+            xrScene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(0.5, 1, 0.5);
+            xrScene.add(directionalLight);
+            
+            // Add another light from opposite direction for even lighting
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight2.position.set(-0.5, 1, -0.5);
+            xrScene.add(directionalLight2);
+            
+            // Create reticle
+            const reticleGeometry = new THREE.RingGeometry(0.08, 0.10, 32);
+            reticleGeometry.rotateX(-Math.PI / 2);
+            const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
+            xrReticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+            xrReticle.visible = false;
+            xrReticle.matrixAutoUpdate = false;
+            xrScene.add(xrReticle);
+            
+            console.log('Android XR initialized');
+        }
+        
+        function loadXRArtwork(path) {
+            if (!window.GLTFLoader) return;
+            
+            // Remove previous artwork
+            if (xrArtworkMesh) {
+                xrScene.remove(xrArtworkMesh);
+                xrArtworkMesh = null;
+            }
+            
+            const loader = new window.GLTFLoader();
+            loader.load(path, (gltf) => {
+                xrArtworkMesh = gltf.scene;
+                xrArtworkMesh.visible = false;
+                xrScene.add(xrArtworkMesh);
+                console.log('XR Artwork loaded:', path);
+            }, undefined, (error) => {
+                console.error('Failed to load XR artwork:', error);
+            });
+        }
+        
+        function onXRSessionEnd() {
+            console.log('Android AR session ended');
+            xrHitTestSource = null;
+            xrHitTestSourceRequested = false;
+            xrSession = null;
+            androidArOverlay.classList.remove('active');
+            
+            // Hide artwork for next session
+            if (xrArtworkMesh) {
+                xrArtworkMesh.visible = false;
+            }
+        }
+        
+        function onXRSelect() {
+            if (xrReticle.visible && xrArtworkMesh) {
+                const THREE = window.THREE;
+                const position = new THREE.Vector3();
+                const quaternion = new THREE.Quaternion();
+                const scale = new THREE.Vector3();
+                xrReticle.matrix.decompose(position, quaternion, scale);
+                
+                xrArtworkMesh.position.copy(position);
+                
+                // Get the surface normal from hit test
+                const surfaceNormal = new THREE.Vector3(0, 1, 0).applyQuaternion(quaternion);
+                
+                if (Math.abs(surfaceNormal.y) < 0.5) {
+                    // Wall detected - make artwork face outward, with UP always pointing to world Y+
+                    // Calculate the direction facing outward from wall (opposite of surface normal projected to XZ plane)
+                    const facingDir = new THREE.Vector3(-surfaceNormal.x, 0, -surfaceNormal.z).normalize();
+                    
+                    // Create rotation: artwork faces 'facingDir', with UP as world Y+
+                    const up = new THREE.Vector3(0, 1, 0);
+                    const rotationMatrix = new THREE.Matrix4();
+                    rotationMatrix.lookAt(new THREE.Vector3(0, 0, 0), facingDir, up);
+                    xrArtworkMesh.quaternion.setFromRotationMatrix(rotationMatrix);
+                } else {
+                    // Floor/ceiling - place it facing camera, with UP as world Y+
+                    const cameraDir = new THREE.Vector3(
+                        xrCamera.position.x - position.x,
+                        0,  // Ignore Y to keep artwork upright
+                        xrCamera.position.z - position.z
+                    ).normalize();
+                    
+                    const up = new THREE.Vector3(0, 1, 0);
+                    const rotationMatrix = new THREE.Matrix4();
+                    rotationMatrix.lookAt(new THREE.Vector3(0, 0, 0), cameraDir, up);
+                    xrArtworkMesh.quaternion.setFromRotationMatrix(rotationMatrix);
+                }
+                
+                xrArtworkMesh.visible = true;
+                androidArStatus.textContent = '✅ 配置完了！別の場所をタップで再配置';
+                androidArStatus.classList.add('success');
+            }
+        }
+        
+        function xrRender(timestamp, frame) {
+            if (!frame) return;
+            
+            const session = xrRenderer.xr.getSession();
+            const referenceSpace = xrRenderer.xr.getReferenceSpace();
+            
+            if (!xrHitTestSourceRequested && session) {
+                session.requestReferenceSpace('viewer').then((viewerSpace) => {
+                    session.requestHitTestSource({ space: viewerSpace }).then((source) => {
+                        xrHitTestSource = source;
+                    }).catch(console.error);
+                }).catch(console.error);
+                xrHitTestSourceRequested = true;
+            }
+            
+            if (xrHitTestSource && referenceSpace) {
+                const hitTestResults = frame.getHitTestResults(xrHitTestSource);
+                
+                if (hitTestResults.length > 0) {
+                    const hit = hitTestResults[0];
+                    const pose = hit.getPose(referenceSpace);
+                    
+                    if (pose) {
+                        xrReticle.matrix.fromArray(pose.transform.matrix);
+                        
+                        // Check if reticle is near the artwork - if so, hide it
+                        let hideReticle = false;
+                        if (xrArtworkMesh?.visible) {
+                            const THREE = window.THREE;
+                            const reticlePos = new THREE.Vector3();
+                            xrReticle.matrix.decompose(reticlePos, new THREE.Quaternion(), new THREE.Vector3());
+                            const distance = reticlePos.distanceTo(xrArtworkMesh.position);
+                            if (distance < 0.3) {  // Hide if within 30cm of artwork
+                                hideReticle = true;
+                            }
+                        }
+                        
+                        xrReticle.visible = !hideReticle;
+                        
+                        if (!xrArtworkMesh?.visible) {
+                            androidArStatus.textContent = '👆 タップして絵画を配置';
+                            androidArStatus.classList.remove('success');
+                        }
+                    }
+                } else {
+                    xrReticle.visible = false;
+                    if (!xrArtworkMesh?.visible) {
+                        androidArStatus.textContent = '📱 壁や床に向けてスキャン中...';
+                        androidArStatus.classList.remove('success');
+                    }
+                }
+            }
+            
+            xrRenderer.render(xrScene, xrCamera);
+        }
+        
+        androidArClose.addEventListener('click', () => {
+            if (xrSession) {
+                xrSession.end();
+            }
+        });
 
         // Initialize
         renderCards();

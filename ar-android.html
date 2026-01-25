@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR表示 - Museum AR</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            overflow: hidden;
+            touch-action: none;
+        }
+        
+        /* Start screen - shown before AR starts */
+        .start-screen {
+            position: fixed;
+            inset: 0;
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+            z-index: 2000;
+        }
+        
+        .start-screen.hidden {
+            display: none;
+        }
+        
+        .artwork-preview {
+            width: 200px;
+            height: 200px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+        }
+        
+        .start-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .start-size {
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 32px;
+        }
+        
+        .start-btn {
+            padding: 18px 50px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #4a90d9, #357abd);
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 16px;
+        }
+        
+        .start-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .start-info {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.85rem;
+        }
+        
+        .back-link {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 1.5rem;
+            padding: 8px;
+        }
+        
+        /* DOM Overlay UI (shown during AR) */
+        .ar-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .ar-overlay.active {
+            display: block;
+        }
+        
+        .ar-overlay > * {
+            pointer-events: auto;
+        }
+        
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 16px;
+            padding-top: max(12px, env(safe-area-inset-top));
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .close-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: #fff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .artwork-info {
+            flex: 1;
+        }
+        
+        .title {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        
+        .size {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.7);
+            margin-top: 2px;
+        }
+        
+        /* Status bar at bottom */
+        .status-bar {
+            position: fixed;
+            bottom: 30px;
+            bottom: max(30px, env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 14px 28px;
+            border-radius: 30px;
+            font-size: 1rem;
+            backdrop-filter: blur(10px);
+            text-align: center;
+            max-width: 90%;
+        }
+        
+        .status-bar.success {
+            background: rgba(34, 139, 34, 0.8);
+        }
+        
+        /* Error screen */
+        .error-screen {
+            position: fixed;
+            inset: 0;
+            background: #1a1a2e;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+            z-index: 3000;
+        }
+        
+        .error-screen.visible {
+            display: flex;
+        }
+        
+        .error-screen h2 {
+            margin-bottom: 16px;
+            color: #ff6b6b;
+        }
+        
+        .error-screen p {
+            color: #aaa;
+            margin-bottom: 24px;
+            max-width: 300px;
+        }
+        
+        .error-screen button {
+            padding: 14px 32px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 10px;
+            background: #4a90d9;
+            color: #fff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- Start screen (user must tap to start AR) -->
+    <div class="start-screen" id="start-screen">
+        <a href="javascript:history.back()" class="back-link">←</a>
+        <div class="artwork-preview">🖼️</div>
+        <div class="start-title" id="start-title">作品名</div>
+        <div class="start-size" id="start-size">サイズ: -- x -- cm</div>
+        <button class="start-btn" id="start-btn">🚀 ARを開始</button>
+        <p class="start-info">カメラへのアクセスを許可してください</p>
+    </div>
+    
+    <!-- AR UI Overlay (shown during AR session) -->
+    <div class="ar-overlay" id="ar-overlay">
+        <div class="header">
+            <button class="close-btn" id="close-btn">✕</button>
+            <div class="artwork-info">
+                <div class="title" id="title">作品名</div>
+                <div class="size" id="size">サイズ: -- x -- cm</div>
+            </div>
+        </div>
+        
+        <div class="status-bar" id="status">📱 壁や床に向けてスキャン中...</div>
+    </div>
+    
+    <!-- Error screen -->
+    <div class="error-screen" id="error-screen">
+        <h2>⚠️ AR非対応</h2>
+        <p id="error-message">このデバイスではWebXR ARがサポートされていません。</p>
+        <button onclick="history.back()">戻る</button>
+    </div>
+
+    <!-- Three.js -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        
+        // URL Parameters
+        const params = new URLSearchParams(location.search);
+        const glbPath = params.get('glb');
+        const artworkTitle = params.get('title') || '作品';
+        const widthCm = parseFloat(params.get('width')) || 50;
+        const heightCm = parseFloat(params.get('height')) || 70;
+        
+        // Update UI
+        document.getElementById('start-title').textContent = artworkTitle;
+        document.getElementById('start-size').textContent = `サイズ: ${widthCm} x ${heightCm} cm`;
+        document.getElementById('title').textContent = artworkTitle;
+        document.getElementById('size').textContent = `サイズ: ${widthCm} x ${heightCm} cm`;
+        
+        // DOM Elements
+        const startScreen = document.getElementById('start-screen');
+        const arOverlay = document.getElementById('ar-overlay');
+        const errorScreen = document.getElementById('error-screen');
+        const errorMessage = document.getElementById('error-message');
+        const statusBar = document.getElementById('status');
+        const startBtn = document.getElementById('start-btn');
+        const closeBtn = document.getElementById('close-btn');
+        
+        // Three.js variables
+        let renderer, scene, camera;
+        let artworkMesh = null;
+        let reticle = null;
+        let hitTestSource = null;
+        let hitTestSourceRequested = false;
+        let xrSession = null;
+        let localReferenceSpace = null;
+        
+        // Check WebXR support on load
+        async function checkSupport() {
+            if (!navigator.xr) {
+                showError('WebXRがサポートされていません。Chrome最新版をお使いください。');
+                return false;
+            }
+            
+            try {
+                const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!isSupported) {
+                    showError('このデバイスではAR機能がサポートされていません。ARCore対応デバイスが必要です。');
+                    return false;
+                }
+                return true;
+            } catch (e) {
+                showError(`AR確認エラー: ${e.message}`);
+                return false;
+            }
+        }
+        
+        // Initialize Three.js
+        function initThreeJS() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+            
+            // Important: alpha: true for AR camera passthrough
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                alpha: true,
+                preserveDrawingBuffer: true
+            });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(0.5, 1, 0.5);
+            scene.add(directionalLight);
+            
+            // Create reticle (ring indicator for placement)
+            const reticleGeometry = new THREE.RingGeometry(0.08, 0.10, 32);
+            reticleGeometry.rotateX(-Math.PI / 2);
+            const reticleMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x00ff00,
+                side: THREE.DoubleSide
+            });
+            reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+            reticle.visible = false;
+            reticle.matrixAutoUpdate = false;
+            scene.add(reticle);
+            
+            // Load artwork GLB
+            if (glbPath) {
+                loadArtwork(glbPath);
+            }
+        }
+        
+        // Load artwork model
+        function loadArtwork(path) {
+            const loader = new GLTFLoader();
+            loader.load(
+                path,
+                (gltf) => {
+                    artworkMesh = gltf.scene;
+                    artworkMesh.visible = false;
+                    scene.add(artworkMesh);
+                    console.log('Artwork loaded:', path);
+                },
+                (progress) => {
+                    console.log('Loading artwork:', (progress.loaded / progress.total * 100) + '%');
+                },
+                (error) => {
+                    console.error('Failed to load artwork:', error);
+                    statusBar.textContent = '⚠️ 作品の読み込みに失敗しました';
+                }
+            );
+        }
+        
+        // Start AR session (called on user tap)
+        async function startAR() {
+            startBtn.disabled = true;
+            startBtn.textContent = '起動中...';
+            
+            try {
+                // Initialize Three.js if not already done
+                if (!renderer) {
+                    initThreeJS();
+                }
+                
+                // Request AR session with user gesture
+                xrSession = await navigator.xr.requestSession('immersive-ar', {
+                    requiredFeatures: ['hit-test', 'local-floor'],
+                    optionalFeatures: ['dom-overlay'],
+                    domOverlay: { root: arOverlay }
+                });
+                
+                console.log('AR session created');
+                
+                // Setup renderer for XR
+                renderer.xr.setReferenceSpaceType('local-floor');
+                await renderer.xr.setSession(xrSession);
+                
+                // Get reference space
+                localReferenceSpace = await xrSession.requestReferenceSpace('local-floor');
+                
+                // Show AR overlay, hide start screen
+                startScreen.classList.add('hidden');
+                arOverlay.classList.add('active');
+                
+                // Handle session end
+                xrSession.addEventListener('end', onSessionEnd);
+                
+                // Handle tap to place
+                xrSession.addEventListener('select', onSelect);
+                
+                // Start render loop
+                renderer.setAnimationLoop(render);
+                
+                console.log('AR session started successfully');
+                
+            } catch (error) {
+                console.error('Failed to start AR:', error);
+                startBtn.disabled = false;
+                startBtn.textContent = '🚀 ARを開始';
+                
+                if (error.name === 'NotAllowedError') {
+                    showError('カメラへのアクセスが拒否されました。設定からカメラの権限を許可してください。');
+                } else if (error.name === 'NotSupportedError') {
+                    showError('このブラウザまたはデバイスではARがサポートされていません。');
+                } else {
+                    showError(`AR起動エラー: ${error.message}`);
+                }
+            }
+        }
+        
+        // Session ended
+        function onSessionEnd() {
+            console.log('AR session ended');
+            hitTestSource = null;
+            hitTestSourceRequested = false;
+            xrSession = null;
+            
+            arOverlay.classList.remove('active');
+            history.back();
+        }
+        
+        // Handle tap - place artwork at hit position
+        function onSelect(event) {
+            if (reticle.visible && artworkMesh) {
+                // Get reticle position and rotation
+                const position = new THREE.Vector3();
+                const quaternion = new THREE.Quaternion();
+                const scale = new THREE.Vector3();
+                reticle.matrix.decompose(position, quaternion, scale);
+                
+                // Position artwork at reticle location
+                artworkMesh.position.copy(position);
+                
+                // Get the normal of the hit surface
+                const normal = new THREE.Vector3(0, 1, 0).applyQuaternion(quaternion);
+                
+                // If hitting a vertical surface (wall)
+                if (Math.abs(normal.y) < 0.5) {
+                    // Wall detected - orient artwork to face outward
+                    artworkMesh.quaternion.copy(quaternion);
+                    artworkMesh.rotateX(Math.PI / 2);
+                } else {
+                    // Floor/ceiling - place facing camera
+                    artworkMesh.lookAt(camera.position.x, artworkMesh.position.y, camera.position.z);
+                }
+                
+                artworkMesh.visible = true;
+                
+                // Update status
+                statusBar.textContent = '✅ 配置完了！別の場所をタップで再配置';
+                statusBar.classList.add('success');
+                
+                console.log('Artwork placed at:', position);
+            }
+        }
+        
+        // Render loop
+        function render(timestamp, frame) {
+            if (!frame) return;
+            
+            const session = renderer.xr.getSession();
+            const referenceSpace = renderer.xr.getReferenceSpace();
+            
+            // Request hit test source if not already done
+            if (!hitTestSourceRequested && session) {
+                session.requestReferenceSpace('viewer').then((viewerSpace) => {
+                    session.requestHitTestSource({ space: viewerSpace }).then((source) => {
+                        hitTestSource = source;
+                        console.log('Hit test source acquired');
+                    }).catch((err) => {
+                        console.error('Failed to get hit test source:', err);
+                    });
+                }).catch((err) => {
+                    console.error('Failed to get viewer space:', err);
+                });
+                hitTestSourceRequested = true;
+            }
+            
+            // Perform hit test
+            if (hitTestSource && referenceSpace) {
+                const hitTestResults = frame.getHitTestResults(hitTestSource);
+                
+                if (hitTestResults.length > 0) {
+                    const hit = hitTestResults[0];
+                    const pose = hit.getPose(referenceSpace);
+                    
+                    if (pose) {
+                        reticle.visible = true;
+                        reticle.matrix.fromArray(pose.transform.matrix);
+                        
+                        // Update UI
+                        if (!artworkMesh?.visible) {
+                            statusBar.textContent = '👆 タップして絵画を配置';
+                            statusBar.classList.remove('success');
+                        }
+                    }
+                } else {
+                    reticle.visible = false;
+                    if (!artworkMesh?.visible) {
+                        statusBar.textContent = '📱 壁や床に向けてスキャン中...';
+                        statusBar.classList.remove('success');
+                    }
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Show error
+        function showError(message) {
+            startScreen.classList.add('hidden');
+            arOverlay.classList.remove('active');
+            errorScreen.classList.add('visible');
+            errorMessage.textContent = message;
+        }
+        
+        // Close AR button
+        closeBtn.addEventListener('click', () => {
+            if (xrSession) {
+                xrSession.end();
+            } else {
+                history.back();
+            }
+        });
+        
+        // Start button - must be user gesture!
+        startBtn.addEventListener('click', () => {
+            startAR();
+        });
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+        
+        // Check support on load
+        checkSupport().then((supported) => {
+            if (supported) {
+                console.log('WebXR AR is supported');
+            }
+        });
+    </script>
+</body>
+</html>
